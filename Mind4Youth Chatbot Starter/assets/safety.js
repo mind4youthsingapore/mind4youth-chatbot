@@ -1,1 +1,0 @@
-// placeholder for crisis detection (see full version in canvas)
