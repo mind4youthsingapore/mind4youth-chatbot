@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mind4Youth – Support Chat</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/web-llm@latest/dist/web-llm.min.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="p-4 md:p-6 bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-3xl mx-auto">
+      <h1 class="text-2xl font-semibold">Mind4Youth – Caring Chatbot</h1>
+      <p class="text-sm text-gray-600 mt-1">
+        This tool offers supportive conversation & self‑help exercises. It does not replace professional help.<br>
+        🇸🇬 SG: 995 (emergency), 1767 SOS, 1771 mindline · 🇺🇸 US: 988 Lifeline
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto p-4 md:p-6">
+    <section id="model-status" class="mb-3 text-sm text-gray-700">Loading model…</section>
+
+    <div id="chat" class="bg-white rounded-2xl shadow p-4 md:p-6 space-y-4">
+      <div id="messages" class="space-y-4 min-h-[40vh] overflow-y-auto"></div>
+      <form id="composer" class="flex gap-2 pt-2">
+        <input id="user-input" class="flex-1 border rounded-xl px-3 py-2" placeholder="Type how you’re feeling…" autocomplete="off" />
+        <button class="px-4 py-2 rounded-xl bg-black text-white" type="submit">Send</button>
+      </form>
+    </div>
+
+    <section class="mt-6 grid gap-3 md:grid-cols-2">
+      <button id="exercise-breath" class="w-full border rounded-xl p-3 hover:bg-gray-50">🌿 60‑second breathing</button>
+      <button id="exercise-journal" class="w-full border rounded-xl p-3 hover:bg-gray-50">📝 3‑minute journal</button>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initModel, generateReply } from './assets/webllm-loader.js';
+    import { isCrisis, crisisAction } from './assets/safety.js';
+    import { startBreathing, startJournal } from './assets/app.js';
+
+    const statusEl = document.getElementById('model-status');
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('user-input');
+    const formEl = document.getElementById('composer');
+
+    function addMsg(role, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = role === 'user' ? 'text-right' : 'text-left';
+      const bubble = document.createElement('div');
+      bubble.className = role === 'user' ? 'inline-block bg-black text-white px-3 py-2 rounded-2xl' : 'inline-block bg-gray-100 px-3 py-2 rounded-2xl';
+      bubble.textContent = text;
+      wrapper.appendChild(bubble);
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function boot() {
+      try {
+        await initModel(status => statusEl.textContent = status);
+        statusEl.textContent = 'Model ready.';
+        addMsg('assistant', 'Hi! I’m here to listen. What’s on your mind today?');
+      } catch (e) {
+        statusEl.textContent = 'Model failed to load. See console.';
+        console.error(e);
+      }
+    }
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+      addMsg('user', text);
+      inputEl.value = '';
+
+      if (isCrisis(text)) {
+        crisisAction(addMsg);
+        return;
+      }
+
+      addMsg('assistant', '…');
+      const lastBubble = messagesEl.lastChild.querySelector('div');
+      try {
+        const nodes = messagesEl.querySelectorAll('div>div');
+        const history = Array.from(nodes).map(n => n.textContent);
+        const reply = await generateReply(history);
+        lastBubble.textContent = reply;
+      } catch (err) {
+        lastBubble.textContent = 'Sorry—something went wrong.';
+        console.error(err);
+      }
+    });
+
+    document.getElementById('exercise-breath').onclick = () => startBreathing(addMsg);
+    document.getElementById('exercise-journal').onclick = () => startJournal(addMsg);
+
+    boot();
+  </script>
+</body>
+</html>
